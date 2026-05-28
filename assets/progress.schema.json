@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Progress Tracker",
+  "type": "object",
+  "required": ["version", "created", "updated", "tasks"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "created": { "type": "string", "format": "date-time" },
+    "updated": { "type": "string", "format": "date-time" },
+    "github_issue": { "type": "integer" },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^t\\d+(\\.\\d+)?$" },
+        "title": { "type": "string" },
+        "status": { "enum": ["pending", "in_progress", "done"] },
+        "alert": { "type": "string" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/subtask" }
+        }
+      }
+    },
+    "subtask": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^t\\d+\\.\\d+$" },
+        "title": { "type": "string" },
+        "status": { "enum": ["pending", "in_progress", "done"] },
+        "alert": { "type": "string" }
+      }
+    }
+  }
+}
