@@ -139,6 +139,38 @@ python runtime.py watch   --id t1.3 --interval 5 --timeout 3600
 
 **Design:** 100% stdlib; all update methods catch exceptions silently so progress reporting never crashes your training job.
 
+## Changelog
+
+### v0.2.0 — Runtime Layer (2026-05-30)
+
+**新增：`scripts/runtime.py`** — 让训练/推理任务自主上报进度，无需 AI 对话介入。
+
+| 接口 | 说明 | 作用 |
+|---|---|---|
+| `@track(task_id)` 装饰器 | import 后装饰函数 | 函数执行前自动标记 `in_progress`，成功返回标记 `done`，抛异常自动写入 `alert` |
+| `RuntimeTracker` 类 | `start()` → `report()` → `done()` | 训练循环内手动上报百分比和状态消息，静默失败不影响主任务 |
+| CLI `report/status/watch` | `python runtime.py report --id t1.3 --pct 60` | Shell 脚本和非 Python 任务直接调用，`watch` 子命令阻塞等待任务完成（CI/CD 用） |
+
+**底层改动：**
+- `progress.py show` — 展示 Runtime 上报的 `progress_pct` 和 `progress_msg`
+- `sync.py` — GitHub Issue body 渲染 Runtime 进度信息
+- JSON Schema → v2：新增 `started_at`、`progress_pct`、`progress_msg` 可选字段
+- `README.md` / `SKILL.md` — 补充 Runtime 层文档
+
+**设计原则：** 100% stdlib 零依赖，所有更新方法静默捕获异常——进度上报失败绝不崩溃训练作业。
+
+---
+
+### v0.1.0 — Skill Layer (2026-05-29)
+
+首次发布。对话驱动的进度管理：
+- `progress.py` — `init` / `update` / `show` / `alert` 本地任务树
+- `sync.py` — `push` / `pull` 与 GitHub Issue 双向同步
+- `SKILL.md` — Claude Code skill 触发规则与工作流
+- 两层嵌套任务树，自动计算百分比，失败告警
+
+---
+
 ## Related
 
 Part of a two-layer system:
