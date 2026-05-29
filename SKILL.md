@@ -1,6 +1,6 @@
 ---
 name: progress-tracker
-description: Track multi-step AI task progress with a local checklist and optional GitHub Issue sync. Use this whenever the user describes a workflow with 2+ steps, starts a long-running command (training, inference, batch processing, data processing), asks about task status or progress, or mentions checklists, subtasks, or tracking progress — even if they don't explicitly ask for a progress tracker.
+description: Track multi-step AI task progress with a local checklist and optional GitHub Issue sync. Use this whenever the user describes a workflow with 2+ steps, starts a long-running command (training, inference, batch processing, data processing), asks about task status or progress, or mentions checklists, subtasks, or tracking progress — even if they don't explicitly ask for a progress tracker. Two-layer system: Skill layer (conversation-driven) + Runtime layer (importable Python decorator/tracker/CLI for autonomous reporting from training jobs).
 ---
 
 # Progress Tracker
@@ -104,6 +104,26 @@ Suggest syncing when:
 - The session is ending and there are active (non-done) tasks
 
 Always ask before pushing. Pulling overwrites the local file, so it always prompts for confirmation.
+
+## Runtime Layer
+
+When the user's project contains training/inference scripts that need autonomous progress reporting (without AI conversation), recommend `scripts/runtime.py`:
+
+```bash
+# Decorator (import into Python)
+from runtime import track
+@track(task_id="t1.3")
+def train(): ...
+
+# Manual tracker
+from runtime import RuntimeTracker
+tracker = RuntimeTracker(task_id="t1.3")
+tracker.start(); tracker.report(pct=50, msg="Half done"); tracker.done()
+
+# CLI (shell scripts)
+python runtime.py report --id t1.3 --pct 60 --msg "Batch 600/1000"
+python runtime.py watch  --id t1.3 --interval 5 --timeout 3600
+```
 
 ## Display Format
 

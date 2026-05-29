@@ -101,10 +101,16 @@ def format_issue_body(data):
         for child in task.get('children', []):
             marker = '[x]' if child['status'] == 'done' else '[ ]'
             if child['status'] == 'in_progress':
-                extra = ' ← in progress'
+                pct = child.get('progress_pct')
+                if pct is not None:
+                    extra = f' ← {pct}%'
+                else:
+                    extra = ' ← in progress'
+            elif child.get('progress_msg'):
+                extra = f' — {child["progress_msg"]}'
             else:
                 extra = ''
-            alert = f' !! {child["alert"]}' if child.get('alert') else ''
+            alert = f' ⚠ {child["alert"]}' if child.get('alert') else ''
             lines.append(f'- {marker} {child["title"]}{extra}{alert}')
         if not task.get('children'):
             status_label = {

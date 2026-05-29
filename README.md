@@ -62,10 +62,11 @@ Requires: git repo + `gh auth login`.
 progress-tracker/
 ├── SKILL.md                  # Skill definition + workflow instructions
 ├── scripts/
-│   ├── progress.py           # init / update / show / alert
-│   └── sync.py               # push / pull (GitHub Issues)
+│   ├── progress.py           # init / update / show / alert (Skill layer)
+│   ├── sync.py               # push / pull (GitHub Issues)
+│   └── runtime.py            # @track / RuntimeTracker / CLI (Runtime layer)
 └── assets/
-    └── progress.schema.json  # JSON Schema for progress.json
+    └── progress.schema.json  # JSON Schema for progress.json (v2)
 ```
 
 ## How It Works
@@ -91,8 +92,55 @@ Progress Tracker - 2026-05-29T14:30
 Total: 2/4 done (50%)
 ```
 
+## Runtime Layer
+
+The **Runtime layer** (`scripts/runtime.py`) lets your Python training/inference code report progress autonomously — no AI conversation needed. Three interfaces:
+
+### 1. `@track` Decorator
+
+```python
+from runtime import track
+
+@track(task_id="t1.3")
+def train_model(epochs=10):
+    for epoch in range(epochs):
+        ...
+
+# Before: marks t1.3 as in_progress
+# After (success): marks t1.3 as done
+# After (exception): sets alert on t1.3, re-raises
+```
+
+### 2. `RuntimeTracker` Class
+
+```python
+from runtime import RuntimeTracker
+
+tracker = RuntimeTracker(task_id="t1.3")
+tracker.start()                         # in_progress, 0%
+
+for epoch in range(10):
+    train_epoch()
+    tracker.report(pct=(epoch+1)*10,    # 10%, 20%, ...
+                   msg=f"Epoch {epoch+1}/10")
+
+tracker.done()                          # done, 100%
+```
+
+### 3. CLI (Shell / Non-Python)
+
+```bash
+python runtime.py report --id t1.3 --status in_progress --pct 60 --msg "Batch 600/1000"
+python runtime.py status  --id t1.3
+python runtime.py watch   --id t1.3 --interval 5 --timeout 3600
+```
+
+`watch` blocks until the task is `done` or gets an `alert` — useful in CI/CD.
+
+**Design:** 100% stdlib; all update methods catch exceptions silently so progress reporting never crashes your training job.
+
 ## Related
 
 Part of a two-layer system:
-- **Skill layer** (this repo) — conversation-driven task management
-- **Runtime layer** (coming soon) — Python decorator/CLI for autonomous progress reporting from training/inference jobs
+- **Skill layer** — `progress.py` + `sync.py` + `SKILL.md` — conversation-driven task management
+- **Runtime layer** — `runtime.py` — autonomous progress reporting from Python/Shell jobs

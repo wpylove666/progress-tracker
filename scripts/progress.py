@@ -156,7 +156,7 @@ def cmd_init(args):
 
     now = datetime.now(CST).isoformat()
     data = {
-        "version": 1,
+        "version": 2,
         "created": now,
         "updated": now,
         "tasks": [
@@ -199,7 +199,7 @@ def cmd_update(args):
 
 
 def cmd_show(args):
-    """Display the progress tree with bars and percentages."""
+    """Display the progress tree with bars, percentages, and runtime info."""
     _path, data = load_progress()
     print(f"Progress Tracker - {data['updated'][:16]}")
     print()
@@ -219,7 +219,9 @@ def cmd_show(args):
     total_count = 0
 
     for task in tasks_to_show:
-        pct = compute_pct(task)
+        # Use runtime progress_pct if available, otherwise compute from children
+        runtime_pct = task.get('progress_pct')
+        pct = runtime_pct if runtime_pct is not None else compute_pct(task)
         n = min(pct // 10, 10)
         bar = '=' * n + ' ' * (10 - n)
 
@@ -234,7 +236,18 @@ def cmd_show(args):
             marker = '[x]' if child['status'] == 'done' else '[ ]'
             extra = extra_map.get(child['status'], '')
             alert = f" !! {child['alert']}" if child.get('alert') else ''
-            print(f"    {marker} {child['title']:34s}{extra}{alert}")
+
+            # Runtime progress info
+            c_pct = child.get('progress_pct')
+            c_msg = child.get('progress_msg')
+            runtime = ''
+            if c_pct is not None and child['status'] == 'in_progress':
+                runtime = f'  ({c_pct}%'
+                if c_msg:
+                    runtime += f' — {c_msg}'
+                runtime += ')'
+
+            print(f"    {marker} {child['title']:34s}{extra}{alert}{runtime}")
             if child['status'] == 'done':
                 total_done += 1
             total_count += 1
