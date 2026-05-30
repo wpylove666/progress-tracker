@@ -1,104 +1,75 @@
-# Progress Tracker — Claude Code Skill
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/dependencies-0-green.svg" alt="Zero Dependencies">
+  <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT License">
+  <img src="https://img.shields.io/badge/platform-Claude%20Code-purple.svg" alt="Claude Code">
+</p>
 
-AI task progress tracking with nested checklists, auto-detected from conversation context.
+# progress-tracker
 
-## What It Does
+**让 AI 执行的每一个任务，进度可见、状态可查、失败可追溯。**
 
-Tracks multi-step AI workflows (fine-tuning, data processing, batch inference, Agent pipelines) with real-time progress feedback:
+A two-layer progress tracking system for Claude Code — Skill layer for conversation-driven task management, Runtime layer for autonomous reporting from training/inference jobs.
 
-- **Auto-detects** tasks from conversation — no manual input needed
-- **Nested checklists** (2-level) with auto-computed percentages
-- **Silent updates** during execution, **alerts on failure**
-- **GitHub Issue sync** — push progress to a live Issue for team visibility
-- **100% Python stdlib** — no external dependencies
+---
 
-## Install
+## 为什么需要它？ / The Problem
 
-```bash
-# Clone into skills directory
-git clone https://github.com/wpylove666/progress-tracker.git ~/.claude/skills/progress-tracker
-```
+用 Claude Code 做复杂任务时：
 
-Claude Code auto-discovers skills in `~/.claude/skills/`. Restart Claude Code or start a new conversation.
+- 😵 AI 执行到一半上下文被压缩，进度信息丢失
+- 🤷 挂着的训练/推理任务，不知道跑到哪一步了
+- 😤 任务失败了没有记录，排查全靠猜
 
-## Quick Start
+`progress-tracker` 解决的就是这个问题：**让多步骤 AI 任务从"黑盒"变成"仪表盘"**。
 
-Start a multi-step task naturally in conversation:
+---
 
-```
-> I need to fine-tune Qwen2.5: prepare data, config LoRA, train, evaluate, export
-```
-
-Claude will detect the workflow and propose a task tree. Confirm, and the tracker is live.
-
-## Commands
-
-### progress.py — Local Progress
-
-```bash
-python progress.py init --title "Task" --subtasks "A,B,C"
-python progress.py update --id t1.2 --status done
-python progress.py show
-python progress.py alert --id t1.3 --msg "CUDA OOM at step 1500"
-```
-
-### sync.py — GitHub Issue Sync
-
-```bash
-python sync.py push    # Local → GitHub Issue
-python sync.py pull    # GitHub Issue → Local
-```
-
-Requires: git repo + `gh auth login`.
-
-## Requirements
-
-- Python 3.10+
-- `gh` CLI (for sync only, optional)
-
-## File Structure
+## 两层架构 / Two Layers
 
 ```
-progress-tracker/
-├── SKILL.md                  # Skill definition + workflow instructions
-├── scripts/
-│   ├── progress.py           # init / update / show / alert (Skill layer)
-│   ├── sync.py               # push / pull (GitHub Issues)
-│   └── runtime.py            # @track / RuntimeTracker / CLI (Runtime layer)
-└── assets/
-    └── progress.schema.json  # JSON Schema for progress.json (v2)
+┌─────────────────────────────────────────────────────┐
+│  Skill Layer (对话驱动)                               │
+│  AI 自动识别多步骤任务 → 创建清单 → 自动更新状态        │
+│  progress.py + sync.py + SKILL.md                     │
+├─────────────────────────────────────────────────────┤
+│  Runtime Layer (代码自主上报)                          │
+│  @track 装饰器 / RuntimeTracker / CLI                  │
+│  训练脚本无需 AI 介入，自主报告进度                     │
+│  runtime.py                                           │
+└─────────────────────────────────────────────────────┘
 ```
 
-## How It Works
+### Skill Layer — AI 对话驱动
 
-1. You describe multi-step work → Claude detects it
-2. Claude proposes a task tree → you confirm
-3. `progress.json` is written to your project root
-4. As steps complete, statuses update silently
-5. Failures trigger alerts with context
-6. Optional: sync to GitHub Issue for team visibility
-
-## Example
+你只需要正常描述任务，AI 自动检测并创建进度跟踪：
 
 ```
-Progress Tracker - 2026-05-29T14:30
+👤 我要微调 Qwen2.5：准备数据 → 配置 LoRA → 训练 → 评估 → 导出
 
-+ Fine-tune Qwen2.5                       [====      ] 40%
-    [x] Prepare training data
-    [x] Configure hyperparameters
-    [ ] Start training                     ← in progress
-    [ ] Evaluate model
+🤖 检测到 5 步工作流，建议创建进度跟踪：
 
-Total: 2/4 done (50%)
+   + 微调 Qwen2.5
+       [ ] 准备训练数据
+       [ ] 配置 LoRA 参数
+       [ ] 启动训练
+       [ ] 评估模型
+       [ ] 导出模型
+
+   创建？[Y/n]
 ```
 
-## Runtime Layer
+执行过程中：
+- ✅ 步骤完成 → 静默更新，不打扰你
+- ❌ 步骤失败 → 立即告警，附加上下文
+- 📊 随时问"进度如何"→ 显示完整进度树
 
-The **Runtime layer** (`scripts/runtime.py`) lets your Python training/inference code report progress autonomously — no AI conversation needed. Three interfaces:
+### Runtime Layer — 代码自主上报
 
-### 1. `@track` Decorator
+训练/推理脚本无需 AI 对话介入，自主报告进度：
 
 ```python
+# 方式 1: 装饰器，一行搞定
 from runtime import track
 
 @track(task_id="t1.3")
@@ -106,73 +77,143 @@ def train_model(epochs=10):
     for epoch in range(epochs):
         ...
 
-# Before: marks t1.3 as in_progress
-# After (success): marks t1.3 as done
-# After (exception): sets alert on t1.3, re-raises
-```
-
-### 2. `RuntimeTracker` Class
-
-```python
+# 方式 2: 手动控制，训练循环内上报
 from runtime import RuntimeTracker
 
 tracker = RuntimeTracker(task_id="t1.3")
-tracker.start()                         # in_progress, 0%
-
+tracker.start()
 for epoch in range(10):
     train_epoch()
-    tracker.report(pct=(epoch+1)*10,    # 10%, 20%, ...
-                   msg=f"Epoch {epoch+1}/10")
-
-tracker.done()                          # done, 100%
+    tracker.report(pct=(epoch+1)*10, msg=f"Epoch {epoch+1}/10")
+tracker.done()
 ```
-
-### 3. CLI (Shell / Non-Python)
 
 ```bash
-python runtime.py report --id t1.3 --status in_progress --pct 60 --msg "Batch 600/1000"
-python runtime.py status  --id t1.3
-python runtime.py watch   --id t1.3 --interval 5 --timeout 3600
+# 方式 3: CLI，Shell 脚本也能用
+python runtime.py report --id t1.3 --pct 60 --msg "Batch 600/1000"
+python runtime.py watch  --id t1.3 --interval 5 --timeout 3600
 ```
 
-`watch` blocks until the task is `done` or gets an `alert` — useful in CI/CD.
+---
 
-**Design:** 100% stdlib; all update methods catch exceptions silently so progress reporting never crashes your training job.
+## 快速开始 / Quick Start
 
-## Changelog
+```bash
+# 1. 安装（克隆到 skills 目录）
+git clone https://github.com/wpylove666/progress-tracker.git ~/.claude/skills/progress-tracker
+
+# 2. 重启 Claude Code，然后在对话中描述一个多步骤任务
+#    例如："帮我做三件事：整理数据、训练模型、生成报告"
+
+# 3. AI 自动检测并提议创建进度跟踪，你确认即可
+```
+
+**就这么简单。** 不需要配置，不需要 API Key，不需要数据库。
+
+---
+
+## 命令速查 / Commands
+
+### `progress.py` — 本地进度管理
+
+```bash
+python progress.py init   --title "任务名" --subtasks "A,B,C"   # 创建
+python progress.py update --id t1.2 --status done               # 更新状态
+python progress.py show                                         # 查看全部
+python progress.py show   --id t1                               # 查看某个
+python progress.py alert  --id t1.3 --msg "CUDA OOM at step 1500"  # 标记告警
+```
+
+### `sync.py` — GitHub Issue 同步
+
+```bash
+python sync.py push   # 本地 → GitHub Issue（团队可见）
+python sync.py pull   # GitHub Issue → 本地
+```
+
+需要：git 仓库 + `gh auth login`
+
+---
+
+## 终端效果 / Demo
+
+```
+Progress Tracker - 2026-05-30T14:30:00
+
++ 微调 Qwen2.5                              [====      ] 40%
+    [x] 准备训练数据
+    [x] 配置 LoRA 参数
+    [ ] 启动训练                              ← in progress
+    [ ] 评估模型
+
+Total: 2/4 done (50%)
+```
+
+---
+
+## 设计原则 / Design
+
+| 原则 | 说明 |
+|------|------|
+| **零依赖** | 100% Python 标准库，`pip install` 都不需要 |
+| **静默失败** | 进度上报失败绝不崩溃你的训练任务 |
+| **本地优先** | 数据存本地 `progress.json`，GitHub Sync 可选 |
+| **两层解耦** | Skill 层和 Runtime 层独立运作，互不依赖 |
+
+---
+
+## 文件结构 / Structure
+
+```
+progress-tracker/
+├── SKILL.md                   # Skill 定义 + AI 触发规则
+├── README.md                  # 你正在看
+├── LICENSE                    # MIT
+├── scripts/
+│   ├── progress.py            # init / update / show / alert
+│   ├── sync.py                # push / pull (GitHub Issues)
+│   └── runtime.py             # @track / RuntimeTracker / CLI
+└── assets/
+    └── progress.schema.json   # JSON Schema v2
+```
+
+---
+
+## 版本历史 / Changelog
 
 ### v0.2.0 — Runtime Layer (2026-05-30)
 
-**新增：`scripts/runtime.py`** — 让训练/推理任务自主上报进度，无需 AI 对话介入。
+新增 `runtime.py`，训练/推理脚本可自主上报进度，无需 AI 介入：
 
-| 接口 | 说明 | 作用 |
-|---|---|---|
-| `@track(task_id)` 装饰器 | import 后装饰函数 | 函数执行前自动标记 `in_progress`，成功返回标记 `done`，抛异常自动写入 `alert` |
-| `RuntimeTracker` 类 | `start()` → `report()` → `done()` | 训练循环内手动上报百分比和状态消息，静默失败不影响主任务 |
-| CLI `report/status/watch` | `python runtime.py report --id t1.3 --pct 60` | Shell 脚本和非 Python 任务直接调用，`watch` 子命令阻塞等待任务完成（CI/CD 用） |
-
-**底层改动：**
-- `progress.py show` — 展示 Runtime 上报的 `progress_pct` 和 `progress_msg`
-- `sync.py` — GitHub Issue body 渲染 Runtime 进度信息
-- JSON Schema → v2：新增 `started_at`、`progress_pct`、`progress_msg` 可选字段
-- `README.md` / `SKILL.md` — 补充 Runtime 层文档
-
-**设计原则：** 100% stdlib 零依赖，所有更新方法静默捕获异常——进度上报失败绝不崩溃训练作业。
-
----
+- `@track(task_id)` 装饰器 — 自动标记函数生命周期
+- `RuntimeTracker` 类 — 训练循环内手动上报
+- CLI `report/status/watch` — Shell 和非 Python 任务也能用
+- `progress_pct` / `progress_msg` / `started_at` 字段支持
 
 ### v0.1.0 — Skill Layer (2026-05-29)
 
-首次发布。对话驱动的进度管理：
-- `progress.py` — `init` / `update` / `show` / `alert` 本地任务树
-- `sync.py` — `push` / `pull` 与 GitHub Issue 双向同步
-- `SKILL.md` — Claude Code skill 触发规则与工作流
-- 两层嵌套任务树，自动计算百分比，失败告警
+首次发布：对话驱动的进度管理 + GitHub Issue 同步。
 
 ---
 
-## Related
+## 适用场景 / Use Cases
 
-Part of a two-layer system:
-- **Skill layer** — `progress.py` + `sync.py` + `SKILL.md` — conversation-driven task management
-- **Runtime layer** — `runtime.py` — autonomous progress reporting from Python/Shell jobs
+- 🏋️ 模型微调/训练（多 epoch，需要跟踪进度）
+- 📊 批量数据处理（多阶段 pipeline）
+- 🤖 Claude Code Agent 工作流（多步骤自动化）
+- 🔧 任何需要"知道跑到哪了"的长时间 AI 任务
+
+---
+
+## 贡献 / Contributing
+
+项目刚起步，欢迎 Issue、PR、Star ⭐
+
+如果你觉得有用，也欢迎分享给其他 Claude Code 用户。
+
+---
+
+<p align="center">
+  <b>Built with ❤️ for the Claude Code community</b><br>
+  <sub>0 dependency · 100% stdlib · MIT licensed</sub>
+</p>
